@@ -14,6 +14,7 @@ type Process struct {
 	CMD string
 }
 
+// Filter processes running in the system according to the filter rule
 func FilterProcess(filter string) ([]Process, error) {
 	d, err := os.Open("/proc")
 	if err != nil {
@@ -64,6 +65,7 @@ func FilterProcess(filter string) ([]Process, error) {
 	return process, nil
 }
 
+// Check if a process exists based on its PID
 func CheckProcessExistByPID(pid int) bool {
 	process := fmt.Sprintf("/proc/%d", pid)
 	_, err := os.Stat(process)
@@ -76,6 +78,7 @@ func CheckProcessExistByPID(pid int) bool {
 	return true
 }
 
+// Terminate relevant processes to apply new configuration
 func KillProcessForApplyNewSettings() {
 	processes, err := FilterProcess(UBUNTU_REMOTE_CONTROL_APPNAME)
 	if err != nil {
