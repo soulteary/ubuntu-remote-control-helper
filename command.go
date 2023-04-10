@@ -8,21 +8,29 @@ import (
 	"strings"
 )
 
+const (
+	UBUNTU_SETTING_KEY_RDP_ENABLE     = `enable`
+	UBUNTU_SETTING_KEY_RDP_SHARE_MODE = `screen-share-mode`
+	UBUNTU_SETTING_KEY_RDP_VIEW_ONLY  = `view-only`
+	UBUNTU_SETTING_KEY_VNC_ENABLE     = `enable`
+)
+
+// Update the remote control related configuration in Ubuntu, and exit the program if any configuration update fails.
 func UpdateSettings(username string, password string) {
-	if !UpdateGnomeSettings(DEFAULT_UBUNTU_REMOTE_DESKTOP_RDP, `enable`, `true`) {
-		log.Fatal("Update gnome settings `enable` failed.")
+	if !UpdateGnomeSettings(DEFAULT_UBUNTU_REMOTE_DESKTOP_RDP, UBUNTU_SETTING_KEY_RDP_ENABLE, `true`) {
+		log.Fatalf("Update gnome settings %s:`%s` failed.", DEFAULT_UBUNTU_REMOTE_DESKTOP_RDP, UBUNTU_SETTING_KEY_RDP_ENABLE)
 	}
 
-	if !UpdateGnomeSettings(DEFAULT_UBUNTU_REMOTE_DESKTOP_RDP, `screen-share-mode`, `mirror-primary`) {
-		log.Fatal("Update gnome settings `screen-share-mode` failed.")
+	if !UpdateGnomeSettings(DEFAULT_UBUNTU_REMOTE_DESKTOP_RDP, UBUNTU_SETTING_KEY_RDP_SHARE_MODE, `mirror-primary`) {
+		log.Fatalf("Update gnome settings %s:`%s` failed.", DEFAULT_UBUNTU_REMOTE_DESKTOP_RDP, UBUNTU_SETTING_KEY_RDP_SHARE_MODE)
 	}
 
-	if !UpdateGnomeSettings(DEFAULT_UBUNTU_REMOTE_DESKTOP_RDP, `view-only`, `false`) {
-		log.Fatal("Update gnome settings `view-only` failed.")
+	if !UpdateGnomeSettings(DEFAULT_UBUNTU_REMOTE_DESKTOP_RDP, UBUNTU_SETTING_KEY_RDP_VIEW_ONLY, `false`) {
+		log.Fatalf("Update gnome settings %s:`%s` failed.", DEFAULT_UBUNTU_REMOTE_DESKTOP_RDP, UBUNTU_SETTING_KEY_RDP_VIEW_ONLY)
 	}
 
-	if !UpdateGnomeSettings(DEFAULT_UBUNTU_REMOTE_DESKTOP_VNC, `enable`, `false`) {
-		log.Fatalf("Update gnome settings %s `enable` failed.", DEFAULT_UBUNTU_REMOTE_DESKTOP_VNC)
+	if !UpdateGnomeSettings(DEFAULT_UBUNTU_REMOTE_DESKTOP_VNC, UBUNTU_SETTING_KEY_VNC_ENABLE, `false`) {
+		log.Fatalf("Update gnome settings %s:`%s` failed.", DEFAULT_UBUNTU_REMOTE_DESKTOP_VNC, UBUNTU_SETTING_KEY_VNC_ENABLE)
 	}
 
 	if !UpdateRemoteControlCredentials(username, password, false) {
