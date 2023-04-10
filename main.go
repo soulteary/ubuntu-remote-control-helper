@@ -13,6 +13,7 @@ const (
 	UBUNTU_REMOTE_CONTROL_APPNAME     = `gnome-remote-desktop`
 	DEFAULT_UBUNTU_REMOTE_DESKTOP_RDP = `org.gnome.desktop.remote-desktop.rdp`
 	DEFAULT_UBUNTU_REMOTE_DESKTOP_VNC = `org.gnome.desktop.remote-desktop.vnc`
+	DEFAULT_UBUNTU_DESKTOP_SESSION    = `org.gnome.desktop.session`
 	DEFAULT_CRONTAB_INTERVAL          = `@every 1m`
 	DEFAULT_USERNAME                  = "soulteary"
 	DEFAULT_PASSWORD                  = "soulteary"

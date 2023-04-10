@@ -13,10 +13,16 @@ const (
 	UBUNTU_SETTING_KEY_RDP_SHARE_MODE = `screen-share-mode`
 	UBUNTU_SETTING_KEY_RDP_VIEW_ONLY  = `view-only`
 	UBUNTU_SETTING_KEY_VNC_ENABLE     = `enable`
+	UBUNTU_SETTING_KEY_IDLE_DELAY     = `idle-delay`
 )
 
 // Update the remote control related configuration in Ubuntu, and exit the program if any configuration update fails.
 func UpdateSettings(username string, password string) {
+
+	if !UpdateGnomeSettings(DEFAULT_UBUNTU_DESKTOP_SESSION, UBUNTU_SETTING_KEY_IDLE_DELAY, `0`) {
+		log.Fatalf("Update gnome settings %s:`%s` failed.", DEFAULT_UBUNTU_DESKTOP_SESSION, UBUNTU_SETTING_KEY_IDLE_DELAY)
+	}
+
 	if !UpdateGnomeSettings(DEFAULT_UBUNTU_REMOTE_DESKTOP_RDP, UBUNTU_SETTING_KEY_RDP_ENABLE, `true`) {
 		log.Fatalf("Update gnome settings %s:`%s` failed.", DEFAULT_UBUNTU_REMOTE_DESKTOP_RDP, UBUNTU_SETTING_KEY_RDP_ENABLE)
 	}
@@ -52,7 +58,7 @@ func ExecuteShellCommand(command string) (string, string, error) {
 // Update the settings in Gnome and check if the changes are actually applied.
 func UpdateGnomeSettings(appName string, key string, value string) bool {
 	setValue := ""
-	if strings.EqualFold(strings.ToLower(value), "true") || strings.EqualFold(strings.ToLower(value), "false") {
+	if strings.EqualFold(strings.ToLower(value), "true") || strings.EqualFold(strings.ToLower(value), "false") || strings.EqualFold(strings.ToLower(value), "0") {
 		setValue = strings.ToLower(value)
 	} else {
 		setValue = fmt.Sprintf(`'%s'`, value)
