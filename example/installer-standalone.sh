@@ -1,7 +1,7 @@
 #!/bin/env bash
 
 # install dependencies
-sudo apt-get install -y libsecret-tools xserver-xorg-core xserver-xorg-video-dummy xvfb dbus-x11
+sudo apt-get install -y libsecret-tools
 
 # download urch
 URCH_VER=1.6.0 \
