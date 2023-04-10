@@ -38,6 +38,7 @@ func UpdateSettings(username string, password string) {
 	}
 }
 
+// Execute system commands using Bash and obtain the normal and error log output contents.
 func ExecuteShellCommand(command string) (string, string, error) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -48,6 +49,7 @@ func ExecuteShellCommand(command string) (string, string, error) {
 	return stdout.String(), stderr.String(), err
 }
 
+// Update the settings in Gnome and check if the changes are actually applied.
 func UpdateGnomeSettings(appName string, key string, value string) bool {
 	setValue := ""
 	if strings.EqualFold(strings.ToLower(value), "true") || strings.EqualFold(strings.ToLower(value), "false") {
@@ -75,10 +77,12 @@ func UpdateGnomeSettings(appName string, key string, value string) bool {
 	return strings.TrimSpace(stdout) == setValue
 }
 
+// Check if the account and password settings are correct for remote control.
 func CheckRemoteControlCredentialsIsCorrect(inputUser string, inputPass string) bool {
 	return UpdateRemoteControlCredentials(inputUser, inputPass, true)
 }
 
+// Update the account and password for remote control.
 func UpdateRemoteControlCredentials(inputUser string, inputPass string, dryrun bool) bool {
 	username := strings.TrimSpace(inputUser)
 	password := strings.TrimSpace(inputPass)
