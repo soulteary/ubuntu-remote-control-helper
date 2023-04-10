@@ -21,6 +21,7 @@ var (
 	URCH_DAEMON = false
 )
 
+// Initialize global variables
 func init() {
 	fmt.Println(`Remote Control Helper`)
 
@@ -40,34 +41,42 @@ func init() {
 	if envDaemon == "true" || envDaemon == "on" || envDaemon == "1" {
 		URCH_DAEMON = true
 	}
-
 }
 
-func applyChange() {
+// attempting to apply the correct configuration.
+func TryToApplyChange() {
 	fmt.Println("check remote control credentials and correct the problem...")
 	if !CheckRemoteControlCredentialsIsCorrect(URCH_USER, URCH_PASS) {
 		UpdateSettings(URCH_USER, URCH_PASS)
 		KillProcessForApplyNewSettings()
 	}
+	fmt.Println("the configuration has been ensured to be correct.")
 }
 
-func task() {
+// create background task
+func CreateBackgroundTask() {
+	fmt.Println("try to create background task...")
 	c := cron.New()
 	_, err := c.AddFunc(DEFAULT_CRONTAB_INTERVAL, func() {
-		applyChange()
+		TryToApplyChange()
 	})
 	if err != nil {
-		fmt.Printf("Create cronjob failed: %s\n", err)
+		fmt.Printf("create background task failed: %s\n", err)
 		return
 	}
-	fmt.Println("Create cronjob succeeded.")
+	fmt.Println("create background task succeeded.")
 	c.Start()
 }
 
 func main() {
-	applyChange()
+	// Regardless of whether the program needs to run in the background or not,
+	// try to execute system configuration updates first.
+	TryToApplyChange()
+
+	// If the program needs to run in the background,
+	// then add a background task and keep the program from exiting.
 	if URCH_DAEMON {
-		go task()
+		go CreateBackgroundTask()
 		var chHoldOn = make(chan struct{})
 		<-chHoldOn
 	}
