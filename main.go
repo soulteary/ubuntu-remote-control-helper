@@ -63,7 +63,7 @@ func init() {
 
 	if cliPass != DEFAULT_PASSWORD && cliPass != "" {
 		URCH_PASS = cliPass
-		fmt.Println(`set remote password by cli:`, URCH_USER)
+		fmt.Println(`set remote password by cli:`, URCH_PASS)
 	}
 
 	cliDaemon = strings.ToLower(strings.TrimSpace(cliDaemon))
