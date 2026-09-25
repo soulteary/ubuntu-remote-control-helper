@@ -6,11 +6,11 @@
 #   bash installer-standalone.sh
 #
 # Env:
-#   URCH_VER  version to install, default 1.8.0
+#   URCH_VER  version to install, default 1.9.0
 
 set -euo pipefail
 
-URCH_VER="${URCH_VER:-1.8.0}"
+URCH_VER="${URCH_VER:-1.9.0}"
 
 # detect the release asset name of the current cpu architecture
 case "$(uname -m)" in

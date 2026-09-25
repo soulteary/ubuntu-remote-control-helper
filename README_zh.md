@@ -15,6 +15,7 @@ Ubuntu 自带的桌面共享（RDP，由 `gnome-remote-desktop` 提供）很容�
 - [使用](#使用)
 - [配置](#配置)
 - [连接](#连接)
+- [从 1.8.0 升级](#从-180-升级)
 - [从 1.7.0 升级](#从-170-升级)
 - [卸载](#卸载)
 - [常见问题](#常见问题)
@@ -188,6 +189,25 @@ sudo ufw allow from 192.168.1.0/24 to any port 3389 proto tcp
 ```
 
 不要在路由器上把这个端口映射到公网，需要从外网连接时请使用 VPN（例如 WireGuard、Tailscale）。
+
+## 从 1.8.0 升级
+
+重新执行你之前使用的安装脚本（`installer-standalone.sh` 或 `installer.sh`，**不要加 `sudo`**）替换程序。如果使用的是 systemd 用户服务，还需要替换服务单元，新版会随图形会话启动：
+
+```bash
+wget -O ~/.config/systemd/user/urch.service https://github.com/soulteary/ubuntu-remote-control-helper/raw/main/example/urch.service
+systemctl --user daemon-reload
+systemctl --user reenable urch.service
+systemctl --user restart urch.service
+```
+
+1.9.0 的行为变化：
+
+- 每一轮都会检查所有设置，而不是只在凭据不一致时才检查，并且只修正不一致的项。
+- 登录 keyring 处于锁定状态时直接报错，不再在屏幕上触发解锁框。
+- 通过 `systemctl --user restart gnome-remote-desktop.service` 让新设置生效，不再结束进程；该单元被禁用时会自动启用，保证重启后守护进程会启动。
+- 密码首尾的空格会被保留。如果你的密码带有首尾空格，urch 会按带空格的密码重新保存凭据。
+- 不再发布 Docker 镜像。
 
 ## 从 1.7.0 升级
 
