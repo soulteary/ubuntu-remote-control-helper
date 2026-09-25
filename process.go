@@ -23,6 +23,17 @@ func IsProgramCmdline(cmdline []byte, program string) bool {
 	return strings.HasPrefix(filepath.Base(argv0), program)
 }
 
+// Check whether the command line is a gnome-remote-desktop daemon of another mode than desktop sharing,
+// e.g. `--handover` used by remote login, or `--headless`.
+func IsOtherRemoteDesktopMode(cmdline []byte) bool {
+	for _, arg := range strings.Split(string(cmdline), "\x00")[1:] {
+		if arg == "--handover" || arg == "--headless" || arg == "--system" {
+			return true
+		}
+	}
+	return false
+}
+
 // Filter processes of the current user running in the system according to the program name
 func FilterProcess(program string) ([]Process, error) {
 	d, err := os.Open("/proc")
@@ -76,7 +87,7 @@ func FilterProcess(program string) ([]Process, error) {
 			if err != nil {
 				continue
 			}
-			if !IsProgramCmdline(cmd, program) {
+			if !IsProgramCmdline(cmd, program) || IsOtherRemoteDesktopMode(cmd) {
 				continue
 			}
 

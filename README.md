@@ -64,8 +64,9 @@ On every check, urch compares the following settings and the stored credentials 
 | `org.gnome.desktop.remote-desktop.rdp view-only` | `false` | Allow controlling the keyboard and mouse. |
 | `org.gnome.desktop.remote-desktop.vnc enable` | `false` | Disable VNC. |
 | RDP credentials in the keyring | your username and password | Stored with `secret-tool` (schema `org.gnome.RemoteDesktop.RdpCredentials`). |
+| systemd user unit `gnome-remote-desktop.service` | enabled | The daemon is only started on login when the unit is enabled. The Settings app enables it when turning on remote desktop, setting gsettings alone does not, so RDP would stop working after reboot. Not changed when the unit is masked or `gnome-remote-desktop-headless.service` is running. |
 
-After changing the RDP / VNC settings or the credentials, urch restarts the current user's `gnome-remote-desktop` processes (by killing them) to apply them. Correcting only `idle-delay` does not interrupt the remote sessions. When everything is already correct, nothing is changed.
+After changing the RDP / VNC settings or the credentials, urch restarts the `gnome-remote-desktop.service` user unit with `systemctl --user restart` to apply them. Only when systemd can not be used, it falls back to killing the current user's desktop sharing daemon (the remote login `--handover` / `--headless` / `--system` daemons are never touched). Correcting only `idle-delay` does not interrupt the remote sessions. When everything is already correct, nothing is changed.
 
 ## Install
 

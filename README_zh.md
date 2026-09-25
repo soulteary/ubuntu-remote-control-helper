@@ -64,8 +64,9 @@ sudo grdctl --system status
 | `org.gnome.desktop.remote-desktop.rdp view-only` | `false` | 允许远程控制键盘和鼠标。 |
 | `org.gnome.desktop.remote-desktop.vnc enable` | `false` | 关闭 VNC。 |
 | keyring 中的 RDP 凭据 | 你设置的用户名和密码 | 通过 `secret-tool` 保存（schema 为 `org.gnome.RemoteDesktop.RdpCredentials`）。 |
+| systemd 用户单元 `gnome-remote-desktop.service` | 已启用（enabled） | 只有启用了这个单元，登录后才会启动远程桌面守护进程。在设置里打开远程桌面时会自动启用它，但只改 gsettings 不会，重启后 RDP 就会失效。单元被 mask，或者 `gnome-remote-desktop-headless.service` 正在运行时，不做修改。 |
 
-修改了 RDP / VNC 设置或凭据后，urch 会结束当前用户的 `gnome-remote-desktop` 进程，让新设置生效；只修正 `idle-delay` 时不会中断远程会话。所有设置都正确时，不做任何修改。
+修改了 RDP / VNC 设置或凭据后，urch 会用 `systemctl --user restart` 重启 `gnome-remote-desktop.service` 用户单元，让新设置生效。只有在无法使用 systemd 时，才会退回到结束当前用户的桌面共享守护进程（远程登录使用的 `--handover`、`--headless`、`--system` 进程不会被结束）。只修正 `idle-delay` 时不会中断远程会话。所有设置都正确时，不做任何修改。
 
 ## 安装
 
