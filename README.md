@@ -31,7 +31,7 @@ urch manages **Desktop Sharing** (sharing the session of a logged-in user). On U
 
 ## What urch changes
 
-When the stored credentials differ from the expected ones, urch applies the following settings for the current user:
+On every check, urch compares the following settings and the stored credentials of the current user with the expected values, and corrects only the ones that differ:
 
 | Setting | Value | Why / side effect |
 |---|---|---|
@@ -42,7 +42,7 @@ When the stored credentials differ from the expected ones, urch applies the foll
 | `org.gnome.desktop.remote-desktop.vnc enable` | `false` | Disable VNC. |
 | RDP credentials in the keyring | your username and password | Stored with `secret-tool` (schema `org.gnome.RemoteDesktop.RdpCredentials`). |
 
-After changing them, urch restarts the current user's `gnome-remote-desktop` processes (by killing them) to apply the new settings.
+After changing the RDP / VNC settings or the credentials, urch restarts the current user's `gnome-remote-desktop` processes (by killing them) to apply them. Correcting only `idle-delay` does not interrupt the remote sessions. When everything is already correct, nothing is changed.
 
 ## Install
 
