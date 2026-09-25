@@ -9,6 +9,7 @@
 Ubuntu 自带的桌面共享（RDP，由 `gnome-remote-desktop` 提供）很容易出问题：keyring 里的凭据可能被改掉或读不出来，屏幕锁定后远程会话就用不了，相关设置也可能被重置。`urch`（Ubuntu Remote Control Helper）会检查远程控制的设置和凭据，并把它们修正为你期望的值。可以只运行一次，也可以在后台持续运行。
 
 - [系统要求](#系统要求)
+- [桌面共享还是远程登录？](#桌面共享还是远程登录)
 - [urch 会修改哪些设置](#urch-会修改哪些设置)
 - [安装](#安装)
 - [使用](#使用)
@@ -27,7 +28,29 @@ Ubuntu 自带的桌面共享（RDP，由 `gnome-remote-desktop` 提供）很容�
 - 桌面用户必须已经登录，并且登录 keyring 处于解锁状态，见[keyring 与自动登录](#keyring-与自动登录)。
 - 支持的 CPU 架构：amd64、arm64、armv7、armv6、386。
 
-urch 管理的是**桌面共享**（共享已登录用户的桌面会话）。Ubuntu 24.04 及以后的设置里还有一个独立的**远程登录**功能（通过 RDP 访问系统级的登录界面），urch 不管理它。
+## 桌面共享还是远程登录？
+
+urch 管理的是**桌面共享**：共享一个已经登录的用户的桌面会话。Ubuntu 24.04 及以后的设置里还有一个独立的**远程登录**功能，urch 不管理它：
+
+| | 桌面共享（urch） | 远程登录（Ubuntu 24.04+） |
+|---|---|---|
+| 连上后看到的 | 本机屏幕上正在显示的会话 | 通过 RDP 从登录界面新开的会话 |
+| 是否需要已登录的用户 | 需要，所以重启后通常要开启自动登录 | 不需要，只要登录界面（GDM）在运行 |
+| 凭据保存位置 | 登录 keyring，必须处于解锁状态 | 系统服务自己的文件，与 keyring 无关 |
+| 默认端口 | 3389（被占用时顺延到下一个空闲端口） | 3389 |
+
+**如果只是想每次重启后都能用 RDP 连上这台机器，优先使用远程登录**，并关闭自动登录，这种情况不需要 urch：
+
+```bash
+sudo grdctl --system rdp set-credentials <RDP用户名> <RDP密码>
+sudo grdctl --system rdp enable
+sudo systemctl enable --now gnome-remote-desktop.service
+sudo grdctl --system status
+```
+
+远程登录要求 GDM 使用 Wayland：确认 `/etc/gdm3/custom.conf` 里没有 `WaylandEnable=false`（安装 NVIDIA 专有驱动后经常会被加上）。在 Ubuntu 24.04 上，远程登录无法接入同一用户已经在本机屏幕上运行的会话，所以不要和该用户的自动登录一起使用。
+
+如果你需要控制的是**本机屏幕上正在运行的同一个会话**（例如继续在机器前开始的工作），再使用 urch。这需要开启自动登录，并把登录 keyring 的密码设为空，安全上的取舍见[keyring 与自动登录](#keyring-与自动登录)。
 
 ## urch 会修改哪些设置
 
@@ -143,13 +166,27 @@ UBUNTU_DAEMON=true UBUNTU_REMOTE_USER=your-user UBUNTU_REMOTE_PASS=your-strong-p
 
 ## 连接
 
-用你设置的用户名和密码连接 `<机器的 IP>:3389`（RDP 默认端口）：
+用你设置的用户名和密码连接 `<机器的 IP>:3389`（RDP 默认端口）。
+
+如果端口已被占用（例如 Ubuntu 24.04 上开启了远程登录），桌面共享会监听下一个空闲端口（最多到 3399，`negotiate-port` 默认开启）。可以这样查看实际端口：
+
+```bash
+ss -tlnp | grep gnome-remote
+```
+
+客户端：
 
 - Windows：远程桌面连接（`mstsc`）
 - macOS：Windows App（原 Microsoft Remote Desktop）
 - Linux：Remmina
 
-如果开启了防火墙，需要放行端口：`sudo ufw allow 3389/tcp`。
+如果开启了防火墙，只对局域网放行端口（把网段和端口换成你自己的）：
+
+```bash
+sudo ufw allow from 192.168.1.0/24 to any port 3389 proto tcp
+```
+
+不要在路由器上把这个端口映射到公网，需要从外网连接时请使用 VPN（例如 WireGuard、Tailscale）。
 
 ## 从 1.7.0 升级
 
@@ -203,7 +240,19 @@ sudo tail -f /var/log/urch.log /var/log/urch.err.log
 
 - **安装后黑屏、进不了桌面**：`/etc/X11/xorg.conf` 中是虚拟显卡驱动的配置（由 `URCH_INSTALL_DUMMY_XORG=1` 安装，或者是 1.7.0 及更早版本的安装脚本写入的）。切换到文本控制台（`Ctrl+Alt+F3`）或通过 ssh 登录，执行 `sudo rm /etc/X11/xorg.conf`（或恢复备份）后重启。
 - **报错 `secret-tool: The connection is closed`、`无法在没有 X11 $DISPLAY 的情况下自动启动 D-Bus`，或者 urch 卡住不动**：urch 连不上该用户的桌面会话。请确认没有用 `sudo` 运行、是以已登录的桌面用户身份运行，并且登录 keyring 已解锁。从 supervisor、cron 或 ssh 启动时，urch 会自动使用 `/run/user/<uid>/bus`；命令超过 30 秒会超时退出，不会一直卡住。如果是从 1.7.0 升级上来的，请看[从 1.7.0 升级](#从-170-升级)。
-- **urch 显示成功，但客户端连不上**：用 `ss -tln | grep 3389` 确认端口在监听，检查防火墙，并确认桌面用户已登录、屏幕没有锁定。
+- **urch 显示成功，但客户端连不上**：用 `ss -tlnp | grep gnome-remote` 查看实际监听的端口（可能是 3390 或更后面的端口，见[连接](#连接)），检查防火墙，并确认桌面用户已登录、屏幕没有锁定。
+- **RDP 端口没有在监听，日志里提示证书无效或缺失**：RDP 需要 TLS 证书，它是在"设置"里第一次打开远程桌面时由设置应用生成的，`gnome-remote-desktop` 自己不会生成，所以只用 urch 配置过的机器可能没有证书。用 `gsettings get org.gnome.desktop.remote-desktop.rdp tls-cert` 检查，值为空就表示没有证书。在"设置"里打开一次远程桌面，或者手动生成：
+
+  ```bash
+  mkdir -p ~/.local/share/gnome-remote-desktop
+  openssl req -new -newkey rsa:4096 -days 3650 -nodes -x509 -subj "/CN=$(hostname)" \
+    -keyout ~/.local/share/gnome-remote-desktop/rdp-tls.key \
+    -out ~/.local/share/gnome-remote-desktop/rdp-tls.crt
+  gsettings set org.gnome.desktop.remote-desktop.rdp tls-key ~/.local/share/gnome-remote-desktop/rdp-tls.key
+  gsettings set org.gnome.desktop.remote-desktop.rdp tls-cert ~/.local/share/gnome-remote-desktop/rdp-tls.crt
+  ```
+
+- **过一段时间后机器就连不上了**：机器可能自动挂起了。Ubuntu 默认接电源时不会自动挂起，但可能在"设置 > 电源"里被改过。用 `gsettings get org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type` 检查，用 `gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing'` 关闭自动挂起。
 
 ## Docker
 
