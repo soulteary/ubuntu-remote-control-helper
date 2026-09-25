@@ -21,6 +21,10 @@ const (
 	SECRET_TOOL_LABEL  = `GNOME Remote Desktop RDP credentials`
 	SECRET_TOOL_SCHEMA = `org.gnome.RemoteDesktop.RdpCredentials`
 
+	// the collection secret-tool stores the credentials in, usually the login keyring
+	SECRET_SERVICE_NAME               = `org.freedesktop.secrets`
+	SECRET_SERVICE_DEFAULT_COLLECTION = `/org/freedesktop/secrets/aliases/default`
+
 	// If the keyring is locked, secret-tool waits for the user to unlock it,
 	// so every command needs a timeout to keep the program from hanging.
 	DEFAULT_COMMAND_TIMEOUT = 30 * time.Second
@@ -111,6 +115,38 @@ func QuoteGVariantString(s string) string {
 // Build the secret which gnome-remote-desktop reads from the keyring.
 func BuildRemoteControlCredentials(username string, password string) string {
 	return fmt.Sprintf(`{'username': <%s>, 'password': <%s>}`, QuoteGVariantString(username), QuoteGVariantString(password))
+}
+
+var ErrKeyringLocked = errors.New("the login keyring is locked, gnome-remote-desktop can not read the credentials either. " +
+	"Log in with your password once to unlock it, or, with automatic login, set an empty password for the login keyring, " +
+	"see https://github.com/soulteary/ubuntu-remote-control-helper#keyring-and-automatic-login")
+
+// Parse the output of `gdbus call` for a boolean property, e.g. `(<true>,)`.
+func ParseGdbusBoolean(output string) (value bool, ok bool) {
+	switch strings.TrimSpace(output) {
+	case "(<true>,)":
+		return true, true
+	case "(<false>,)":
+		return false, true
+	}
+	return false, false
+}
+
+// Check if the default keyring, which stores the credentials, is locked.
+// Reading a secret from a locked keyring makes secret-tool show an unlock prompt on the screen
+// and wait for it, while reading the `Locked` property does not prompt.
+// Returns false when the state can not be determined, e.g. gdbus is missing or no default keyring exists yet,
+// so that secret-tool still gets the chance to create or unlock it.
+func IsDefaultKeyringLocked() bool {
+	stdout, _, err := ExecuteCommand("", "gdbus", "call", "--session",
+		"--dest", SECRET_SERVICE_NAME,
+		"--object-path", SECRET_SERVICE_DEFAULT_COLLECTION,
+		"--method", "org.freedesktop.DBus.Properties.Get", "org.freedesktop.Secret.Collection", "Locked")
+	if err != nil {
+		return false
+	}
+	locked, ok := ParseGdbusBoolean(stdout)
+	return ok && locked
 }
 
 // Check if the account and password settings are correct for remote control.

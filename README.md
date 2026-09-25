@@ -194,6 +194,7 @@ sudo tail -f /var/log/urch.log /var/log/urch.err.log
 ```
 
 - **Black screen / cannot enter the desktop after installing**: `/etc/X11/xorg.conf` contains the dummy display driver config (installed by `URCH_INSTALL_DUMMY_XORG=1`, or by the installer of 1.7.0 and earlier). Switch to a text console (`Ctrl+Alt+F3`) or connect with ssh, run `sudo rm /etc/X11/xorg.conf` (or restore your backup) and reboot.
+- **`the login keyring is locked`**: urch found the login keyring locked and did not read it (reading a locked keyring shows an unlock prompt on the screen, which would pop up every minute in daemon mode). gnome-remote-desktop cannot read the credentials in this state either, so remote connections fail. Log in with your password once, or with automatic login, see [Keyring and automatic login](#keyring-and-automatic-login).
 - **`secret-tool: The connection is closed`, `Cannot autolaunch D-Bus without X11 $DISPLAY`, or urch hangs**: urch cannot reach the desktop session of the user. Make sure it is not run with `sudo`, runs as the logged-in desktop user, and the login keyring is unlocked. When started from supervisor/cron/ssh, urch uses `/run/user/<uid>/bus` automatically, and commands time out after 30 seconds instead of hanging. If you upgraded from 1.7.0, see [Upgrade from 1.7.0](#upgrade-from-170).
 - **urch reports success but the client cannot connect**: check that the port is listening with `ss -tln | grep 3389`, check the firewall, and make sure the desktop user is logged in and the session is not locked.
 

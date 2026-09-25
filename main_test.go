@@ -62,3 +62,22 @@ func TestIsProgramCmdline(t *testing.T) {
 		}
 	}
 }
+
+func TestParseGdbusBoolean(t *testing.T) {
+	cases := []struct {
+		output    string
+		wantValue bool
+		wantOK    bool
+	}{
+		{"(<true>,)\n", true, true},
+		{"(<false>,)\n", false, true},
+		{"", false, false},
+		{"Error: GDBus.Error:org.freedesktop.DBus.Error.UnknownObject", false, false},
+	}
+	for _, c := range cases {
+		value, ok := ParseGdbusBoolean(c.output)
+		if value != c.wantValue || ok != c.wantOK {
+			t.Errorf("ParseGdbusBoolean(%q) = %v, %v, want %v, %v", c.output, value, ok, c.wantValue, c.wantOK)
+		}
+	}
+}
