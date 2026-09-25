@@ -92,8 +92,9 @@ func TryToApplyChange(config Config) error {
 		if err := UpdateSettings(config.User, config.Pass); err != nil {
 			return err
 		}
-		KillProcessForApplyNewSettings()
+		RestartRemoteDesktopService()
 	}
+	EnsureRemoteDesktopServiceEnabled()
 	fmt.Println("the configuration has been ensured to be correct.")
 	return nil
 }
