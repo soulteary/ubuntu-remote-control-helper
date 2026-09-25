@@ -31,7 +31,7 @@ urch 管理的是**桌面共享**（共享已登录用户的桌面会话）。Ub
 
 ## urch 会修改哪些设置
 
-当 keyring 中保存的凭据与期望值不一致时，urch 会为当前用户应用以下设置：
+每次检查时，urch 都会把当前用户的以下设置和 keyring 中保存的凭据与期望值逐项比较，只修正不一致的项：
 
 | 设置 | 值 | 原因 / 副作用 |
 |---|---|---|
@@ -42,7 +42,7 @@ urch 管理的是**桌面共享**（共享已登录用户的桌面会话）。Ub
 | `org.gnome.desktop.remote-desktop.vnc enable` | `false` | 关闭 VNC。 |
 | keyring 中的 RDP 凭据 | 你设置的用户名和密码 | 通过 `secret-tool` 保存（schema 为 `org.gnome.RemoteDesktop.RdpCredentials`）。 |
 
-修改完成后，urch 会结束当前用户的 `gnome-remote-desktop` 进程，让新设置生效。
+修改了 RDP / VNC 设置或凭据后，urch 会结束当前用户的 `gnome-remote-desktop` 进程，让新设置生效；只修正 `idle-delay` 时不会中断远程会话。所有设置都正确时，不做任何修改。
 
 ## 安装
 

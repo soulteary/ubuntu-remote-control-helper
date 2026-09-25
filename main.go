@@ -83,15 +83,12 @@ func ParseConfig(args []string, getenv func(string) string) (Config, error) {
 func TryToApplyChange(config Config) error {
 	EnsureSessionBusEnv()
 
-	fmt.Println("check remote control credentials and correct the problem...")
-	ok, err := CheckRemoteControlCredentialsIsCorrect(config.User, config.Pass)
+	fmt.Println("check remote control settings and credentials and correct the problem...")
+	restart, err := EnsureRemoteControlConfig(config.User, config.Pass)
 	if err != nil {
 		return err
 	}
-	if !ok {
-		if err := UpdateSettings(config.User, config.Pass); err != nil {
-			return err
-		}
+	if restart {
 		KillProcessForApplyNewSettings()
 	}
 	fmt.Println("the configuration has been ensured to be correct.")
