@@ -29,7 +29,17 @@ sudo apt-get install -y libsecret-tools wget
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 URCH_PKG="urch_${URCH_VER}_linux_${URCH_ARCH}.tar.gz"
-wget -O "$TMP_DIR/$URCH_PKG" "https://github.com/soulteary/ubuntu-remote-control-helper/releases/download/v${URCH_VER}/${URCH_PKG}"
+URCH_SUMS="urch_${URCH_VER}_checksums.txt"
+URCH_URL="https://github.com/soulteary/ubuntu-remote-control-helper/releases/download/v${URCH_VER}"
+wget -O "$TMP_DIR/$URCH_PKG" "${URCH_URL}/${URCH_PKG}"
+wget -O "$TMP_DIR/$URCH_SUMS" "${URCH_URL}/${URCH_SUMS}"
+
+# verify the archive against the checksums of the release
+if ! grep -E "^[0-9a-f]{64}  ${URCH_PKG}\$" "$TMP_DIR/$URCH_SUMS" > "$TMP_DIR/$URCH_PKG.sha256"; then
+  echo "no checksum found for ${URCH_PKG} in ${URCH_SUMS}" >&2
+  exit 1
+fi
+(cd "$TMP_DIR" && sha256sum -c "$URCH_PKG.sha256")
 tar zxf "$TMP_DIR/$URCH_PKG" -C "$TMP_DIR" urch
 
 # copy urch to executable directory

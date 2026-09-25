@@ -9,6 +9,7 @@ Make Ubuntu native remote control easy to use and reliable.
 Ubuntu's built-in Desktop Sharing (RDP, provided by `gnome-remote-desktop`) is easy to break: the credentials in the keyring can change or become unreadable, the remote session becomes unusable once the screen locks, and the settings can be reset. `urch` (Ubuntu Remote Control Helper) checks the remote control settings and credentials, and corrects them to the values you expect, either once or continuously in the background.
 
 - [Requirements](#requirements)
+- [Desktop Sharing or Remote Login?](#desktop-sharing-or-remote-login)
 - [What urch changes](#what-urch-changes)
 - [Install](#install)
 - [Usage](#usage)
@@ -27,11 +28,33 @@ Ubuntu's built-in Desktop Sharing (RDP, provided by `gnome-remote-desktop`) is e
 - The desktop user must be logged in, and the login keyring must be unlocked, see [Keyring and automatic login](#keyring-and-automatic-login).
 - CPU architectures: amd64, arm64, armv7, armv6, 386.
 
-urch manages **Desktop Sharing** (sharing the session of a logged-in user). On Ubuntu 24.04 and later, Settings also has a separate **Remote Login** feature (a system-level login screen over RDP), urch does not manage it.
+## Desktop Sharing or Remote Login?
+
+urch manages **Desktop Sharing**: it shares the session of a user who is already logged in. On Ubuntu 24.04 and later, Settings also has a separate **Remote Login** feature, urch does not manage it:
+
+| | Desktop Sharing (urch) | Remote Login (Ubuntu 24.04+) |
+|---|---|---|
+| What you get | the session that is shown on the local screen | a new session started from the login screen over RDP |
+| Needs a logged-in user | yes, so it usually needs automatic login after reboot | no, only the login screen (GDM) must be running |
+| Credentials stored in | the login keyring, which must be unlocked | a file of the system service, no keyring involved |
+| Default port | 3389 (moves to the next free port when taken) | 3389 |
+
+**If you only need to reach the machine over RDP after every reboot, prefer Remote Login** and keep automatic login disabled, you do not need urch:
+
+```bash
+sudo grdctl --system rdp set-credentials <rdp-user> <rdp-password>
+sudo grdctl --system rdp enable
+sudo systemctl enable --now gnome-remote-desktop.service
+sudo grdctl --system status
+```
+
+Remote Login needs GDM on Wayland: make sure `/etc/gdm3/custom.conf` does not contain `WaylandEnable=false` (often set with proprietary NVIDIA drivers). On Ubuntu 24.04 a remote login cannot join a session that the same user already has on the local screen, so do not combine it with automatic login of that user.
+
+Use urch when you need to control **the same session that runs on the local screen**, e.g. to continue work started at the machine. This needs automatic login and a login keyring without password, see [Keyring and automatic login](#keyring-and-automatic-login) for the security trade-off.
 
 ## What urch changes
 
-When the stored credentials differ from the expected ones, urch applies the following settings for the current user:
+On every check, urch compares the following settings and the stored credentials of the current user with the expected values, and corrects only the ones that differ:
 
 | Setting | Value | Why / side effect |
 |---|---|---|
@@ -43,7 +66,7 @@ When the stored credentials differ from the expected ones, urch applies the foll
 | RDP credentials in the keyring | your username and password | Stored with `secret-tool` (schema `org.gnome.RemoteDesktop.RdpCredentials`). |
 | systemd user unit `gnome-remote-desktop.service` | enabled | The daemon is only started on login when the unit is enabled. The Settings app enables it when turning on remote desktop, setting gsettings alone does not, so RDP would stop working after reboot. Not changed when the unit is masked or `gnome-remote-desktop-headless.service` is running. |
 
-After changing them, urch restarts the `gnome-remote-desktop.service` user unit with `systemctl --user restart` to apply the new settings. Only when systemd can not be used, it falls back to killing the current user's desktop sharing daemon (the remote login `--handover` / `--headless` / `--system` daemons are never touched).
+After changing the RDP / VNC settings or the credentials, urch restarts the `gnome-remote-desktop.service` user unit with `systemctl --user restart` to apply them. Only when systemd can not be used, it falls back to killing the current user's desktop sharing daemon (the remote login `--handover` / `--headless` / `--system` daemons are never touched). Correcting only `idle-delay` does not interrupt the remote sessions. When everything is already correct, nothing is changed.
 
 ## Install
 
@@ -58,9 +81,13 @@ The service runs inside your own desktop session, so urch can reach the session 
 wget https://github.com/soulteary/ubuntu-remote-control-helper/raw/main/example/installer-standalone.sh
 bash installer-standalone.sh
 
-# set your remote control username and password
-printf "UBUNTU_REMOTE_USER='your-user'\nUBUNTU_REMOTE_PASS='your-strong-password'\n" > ~/.config/urch.env
-chmod 600 ~/.config/urch.env
+# set your remote control username and password, the file is readable only by you
+mkdir -p ~/.config
+install -m 600 /dev/null ~/.config/urch.env
+cat > ~/.config/urch.env <<'EOF'
+UBUNTU_REMOTE_USER='your-user'
+UBUNTU_REMOTE_PASS='your-strong-password'
+EOF
 
 # install and start the service
 mkdir -p ~/.config/systemd/user
@@ -68,6 +95,10 @@ wget -O ~/.config/systemd/user/urch.service https://github.com/soulteary/ubuntu-
 systemctl --user daemon-reload
 systemctl --user enable --now urch.service
 ```
+
+Values in `urch.env` are wrapped in single quotes, so characters such as `$`, `%`, `"` and `\` in the password are kept as is. If the password contains a single quote `'`, wrap it in double quotes instead and escape `"` and `\` with a backslash. Leading and trailing spaces of the password are kept.
+
+The service starts with the graphical session and stops when you log out. If you installed an older `urch.service` (with `WantedBy=default.target`), run `systemctl --user reenable urch.service` after replacing the file.
 
 ### Option 2: supervisor
 
@@ -89,7 +120,7 @@ bash installer-standalone.sh
 
 Or download the archive for your architecture from [Releases](https://github.com/soulteary/ubuntu-remote-control-helper/releases) and verify it with `urch_<version>_checksums.txt`. Then run it yourself, see [Usage](#usage).
 
-The installers install the version pinned in the script by default, set `URCH_VER=x.y.z` to choose another one.
+The installers install the version pinned in the script by default, set `URCH_VER=x.y.z` to choose another one. The downloaded archive is verified against `urch_<version>_checksums.txt` of the release.
 
 ### Machines without a monitor
 
@@ -136,13 +167,27 @@ Every option can be set with an environment variable or a command line argument;
 
 ## Connect
 
-Connect to `<ip-of-the-machine>:3389` (the default RDP port) with the username and password you set:
+Connect to `<ip-of-the-machine>:3389` (the default RDP port) with the username and password you set.
+
+When the port is already taken, e.g. by Remote Login on Ubuntu 24.04, Desktop Sharing listens on the next free port (up to 3399, `negotiate-port` is enabled by default). Check the actual port with:
+
+```bash
+ss -tlnp | grep gnome-remote
+```
+
+Clients:
 
 - Windows: Remote Desktop Connection (`mstsc`)
 - macOS: Windows App (formerly Microsoft Remote Desktop)
 - Linux: Remmina
 
-If the firewall is enabled, allow the port: `sudo ufw allow 3389/tcp`.
+If the firewall is enabled, allow the port from your local network only (replace the subnet and the port with yours):
+
+```bash
+sudo ufw allow from 192.168.1.0/24 to any port 3389 proto tcp
+```
+
+Do not forward the port to the internet on your router, use a VPN (e.g. WireGuard, Tailscale) to connect from outside.
 
 ## Upgrade from 1.7.0
 
@@ -196,11 +241,23 @@ sudo tail -f /var/log/urch.log /var/log/urch.err.log
 
 - **Black screen / cannot enter the desktop after installing**: `/etc/X11/xorg.conf` contains the dummy display driver config (installed by `URCH_INSTALL_DUMMY_XORG=1`, or by the installer of 1.7.0 and earlier). Switch to a text console (`Ctrl+Alt+F3`) or connect with ssh, run `sudo rm /etc/X11/xorg.conf` (or restore your backup) and reboot.
 - **`secret-tool: The connection is closed`, `Cannot autolaunch D-Bus without X11 $DISPLAY`, or urch hangs**: urch cannot reach the desktop session of the user. Make sure it is not run with `sudo`, runs as the logged-in desktop user, and the login keyring is unlocked. When started from supervisor/cron/ssh, urch uses `/run/user/<uid>/bus` automatically, and commands time out after 30 seconds instead of hanging. If you upgraded from 1.7.0, see [Upgrade from 1.7.0](#upgrade-from-170).
-- **urch reports success but the client cannot connect**: check that the port is listening with `ss -tln | grep 3389`, check the firewall, and make sure the desktop user is logged in and the session is not locked.
+- **urch reports success but the client cannot connect**: check the listening port with `ss -tlnp | grep gnome-remote` (it may be 3390 or later, see [Connect](#connect)), check the firewall, and make sure the desktop user is logged in and the session is not locked.
+- **Nothing listens on the RDP port, the logs mention an invalid or missing certificate**: RDP needs a TLS certificate, which the Settings app generates the first time remote desktop is turned on there. gnome-remote-desktop does not generate it by itself, so a machine configured only by urch may have none. Check with `gsettings get org.gnome.desktop.remote-desktop.rdp tls-cert`, an empty value means no certificate. Turn on remote desktop in Settings once, or generate one:
+
+  ```bash
+  mkdir -p ~/.local/share/gnome-remote-desktop
+  openssl req -new -newkey rsa:4096 -days 3650 -nodes -x509 -subj "/CN=$(hostname)" \
+    -keyout ~/.local/share/gnome-remote-desktop/rdp-tls.key \
+    -out ~/.local/share/gnome-remote-desktop/rdp-tls.crt
+  gsettings set org.gnome.desktop.remote-desktop.rdp tls-key ~/.local/share/gnome-remote-desktop/rdp-tls.key
+  gsettings set org.gnome.desktop.remote-desktop.rdp tls-cert ~/.local/share/gnome-remote-desktop/rdp-tls.crt
+  ```
+
+- **The machine is unreachable after a while**: it may have suspended. Ubuntu does not suspend on AC power by default, but it may have been changed in Settings > Power. Check with `gsettings get org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type`, and disable it with `gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing'`.
 
 ## Docker
 
-The Docker images published to Docker Hub are **not supported**: urch must run inside the desktop user's session (gsettings, keyring, D-Bus), which is not available in a container. Install the program on the host instead.
+No Docker image is published: urch must run inside the desktop user's session (gsettings, keyring, D-Bus), which is not available in a container. The images published to Docker Hub by earlier releases are not supported, install the program on the host instead.
 
 ## Development
 

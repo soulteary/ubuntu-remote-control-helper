@@ -3,16 +3,24 @@
 # Install (as the desktop user, not with sudo):
 #   mkdir -p ~/.config/systemd/user
 #   cp urch.service ~/.config/systemd/user/urch.service
-#   printf "UBUNTU_REMOTE_USER='your-user'\nUBUNTU_REMOTE_PASS='your-strong-password'\n" > ~/.config/urch.env
-#   chmod 600 ~/.config/urch.env
+#   install -m 600 /dev/null ~/.config/urch.env
+#   # then put the following two lines into ~/.config/urch.env with an editor:
+#   #   UBUNTU_REMOTE_USER='your-user'
+#   #   UBUNTU_REMOTE_PASS='your-strong-password'
 #   systemctl --user daemon-reload
 #   systemctl --user enable --now urch.service
+#
+# The service starts with the graphical session and stops when the user logs out.
+# If an older version of this file (WantedBy=default.target) was enabled,
+# run `systemctl --user reenable urch.service` after replacing it.
 #
 # Logs:
 #   journalctl --user -u urch.service -f
 
 [Unit]
 Description=Ubuntu Remote Control Helper
+PartOf=graphical-session.target
+After=graphical-session.target
 
 [Service]
 EnvironmentFile=%h/.config/urch.env
@@ -21,4 +29,4 @@ Restart=on-failure
 RestartSec=10
 
 [Install]
-WantedBy=default.target
+WantedBy=graphical-session.target
