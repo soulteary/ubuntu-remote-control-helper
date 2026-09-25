@@ -18,6 +18,9 @@ func TestParseConfig(t *testing.T) {
 		{"cli overrides env", []string{"--user=c", "--pass=cp", "--daemon=1"}, map[string]string{"UBUNTU_REMOTE_USER": "u", "UBUNTU_REMOTE_PASS": "p"}, Config{"c", "cp", true}},
 		// passing a value equal to the default must still override env
 		{"cli equal to default", []string{"--user=" + DEFAULT_USERNAME}, map[string]string{"UBUNTU_REMOTE_USER": "u"}, Config{DEFAULT_USERNAME, DEFAULT_PASSWORD, false}},
+		{"password spaces are kept", []string{"--pass= cp "}, map[string]string{"UBUNTU_REMOTE_PASS": " p "}, Config{DEFAULT_USERNAME, " cp ", false}},
+		{"env password spaces are kept", nil, map[string]string{"UBUNTU_REMOTE_PASS": " p "}, Config{DEFAULT_USERNAME, " p ", false}},
+		{"blank password is ignored", []string{"--pass=  "}, nil, Config{DEFAULT_USERNAME, DEFAULT_PASSWORD, false}},
 		{"cli daemon off overrides env", []string{"--daemon=false"}, map[string]string{"UBUNTU_DAEMON": "true"}, Config{DEFAULT_USERNAME, DEFAULT_PASSWORD, false}},
 	}
 

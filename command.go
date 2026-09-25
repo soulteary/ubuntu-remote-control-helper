@@ -122,8 +122,8 @@ func CheckRemoteControlCredentialsIsCorrect(inputUser string, inputPass string) 
 // When `dryrun` is true, only compare the stored credentials with the expected ones.
 func UpdateRemoteControlCredentials(inputUser string, inputPass string, dryrun bool) (bool, error) {
 	username := strings.TrimSpace(inputUser)
-	password := strings.TrimSpace(inputPass)
-	if username == "" || password == "" {
+	password := inputPass
+	if username == "" || strings.TrimSpace(password) == "" {
 		return false, errors.New("username and password must not be empty")
 	}
 	credentials := BuildRemoteControlCredentials(username, password)

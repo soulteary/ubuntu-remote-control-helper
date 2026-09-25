@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -43,7 +44,8 @@ func ParseConfig(args []string, getenv func(string) string) (Config, error) {
 		config.User = envUser
 		fmt.Println(`set remote username by env:`, config.User)
 	}
-	if envPass := strings.TrimSpace(getenv("UBUNTU_REMOTE_PASS")); envPass != "" {
+	// the password is used as is, leading and trailing spaces are part of it
+	if envPass := getenv("UBUNTU_REMOTE_PASS"); strings.TrimSpace(envPass) != "" {
 		config.Pass = envPass
 		fmt.Println(`set remote password by env`)
 	}
@@ -68,7 +70,7 @@ func ParseConfig(args []string, getenv func(string) string) (Config, error) {
 				fmt.Println(`set remote username by cli:`, config.User)
 			}
 		case "pass":
-			if v := strings.TrimSpace(*cliPass); v != "" {
+			if v := *cliPass; strings.TrimSpace(v) != "" {
 				config.Pass = v
 				fmt.Println(`set remote password by cli`)
 			}
@@ -120,6 +122,9 @@ func main() {
 
 	config, err := ParseConfig(os.Args[1:], os.Getenv)
 	if err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			os.Exit(0)
+		}
 		os.Exit(2)
 	}
 

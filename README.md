@@ -57,9 +57,13 @@ The service runs inside your own desktop session, so urch can reach the session 
 wget https://github.com/soulteary/ubuntu-remote-control-helper/raw/main/example/installer-standalone.sh
 bash installer-standalone.sh
 
-# set your remote control username and password
-printf "UBUNTU_REMOTE_USER='your-user'\nUBUNTU_REMOTE_PASS='your-strong-password'\n" > ~/.config/urch.env
-chmod 600 ~/.config/urch.env
+# set your remote control username and password, the file is readable only by you
+mkdir -p ~/.config
+install -m 600 /dev/null ~/.config/urch.env
+cat > ~/.config/urch.env <<'EOF'
+UBUNTU_REMOTE_USER='your-user'
+UBUNTU_REMOTE_PASS='your-strong-password'
+EOF
 
 # install and start the service
 mkdir -p ~/.config/systemd/user
@@ -67,6 +71,10 @@ wget -O ~/.config/systemd/user/urch.service https://github.com/soulteary/ubuntu-
 systemctl --user daemon-reload
 systemctl --user enable --now urch.service
 ```
+
+Values in `urch.env` are wrapped in single quotes, so characters such as `$`, `%`, `"` and `\` in the password are kept as is. If the password contains a single quote `'`, wrap it in double quotes instead and escape `"` and `\` with a backslash. Leading and trailing spaces of the password are kept.
+
+The service starts with the graphical session and stops when you log out. If you installed an older `urch.service` (with `WantedBy=default.target`), run `systemctl --user reenable urch.service` after replacing the file.
 
 ### Option 2: supervisor
 
@@ -88,7 +96,7 @@ bash installer-standalone.sh
 
 Or download the archive for your architecture from [Releases](https://github.com/soulteary/ubuntu-remote-control-helper/releases) and verify it with `urch_<version>_checksums.txt`. Then run it yourself, see [Usage](#usage).
 
-The installers install the version pinned in the script by default, set `URCH_VER=x.y.z` to choose another one.
+The installers install the version pinned in the script by default, set `URCH_VER=x.y.z` to choose another one. The downloaded archive is verified against `urch_<version>_checksums.txt` of the release.
 
 ### Machines without a monitor
 
@@ -199,7 +207,7 @@ sudo tail -f /var/log/urch.log /var/log/urch.err.log
 
 ## Docker
 
-The Docker images published to Docker Hub are **not supported**: urch must run inside the desktop user's session (gsettings, keyring, D-Bus), which is not available in a container. Install the program on the host instead.
+No Docker image is published: urch must run inside the desktop user's session (gsettings, keyring, D-Bus), which is not available in a container. The images published to Docker Hub by earlier releases are not supported, install the program on the host instead.
 
 ## Development
 

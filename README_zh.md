@@ -57,9 +57,13 @@ urch 管理的是**桌面共享**（共享已登录用户的桌面会话）。Ub
 wget https://github.com/soulteary/ubuntu-remote-control-helper/raw/main/example/installer-standalone.sh
 bash installer-standalone.sh
 
-# 设置远程控制的用户名和密码
-printf "UBUNTU_REMOTE_USER='your-user'\nUBUNTU_REMOTE_PASS='your-strong-password'\n" > ~/.config/urch.env
-chmod 600 ~/.config/urch.env
+# 设置远程控制的用户名和密码，这个文件只有你自己能读
+mkdir -p ~/.config
+install -m 600 /dev/null ~/.config/urch.env
+cat > ~/.config/urch.env <<'EOF'
+UBUNTU_REMOTE_USER='your-user'
+UBUNTU_REMOTE_PASS='your-strong-password'
+EOF
 
 # 安装并启动服务
 mkdir -p ~/.config/systemd/user
@@ -67,6 +71,10 @@ wget -O ~/.config/systemd/user/urch.service https://github.com/soulteary/ubuntu-
 systemctl --user daemon-reload
 systemctl --user enable --now urch.service
 ```
+
+`urch.env` 中的值用单引号包起来，所以密码里的 `$`、`%`、`"`、`\` 等字符都会原样保留。如果密码里有单引号 `'`，请改用双引号包起来，并用反斜杠转义其中的 `"` 和 `\`。密码首尾的空格会被保留。
+
+服务会随图形会话启动，注销时停止。如果之前安装过旧版的 `urch.service`（`WantedBy=default.target`），替换文件后请执行 `systemctl --user reenable urch.service`。
 
 ### 方式二：supervisor
 
@@ -88,7 +96,7 @@ bash installer-standalone.sh
 
 也可以从 [Releases](https://github.com/soulteary/ubuntu-remote-control-helper/releases) 下载对应架构的压缩包，用 `urch_<version>_checksums.txt` 校验后自行运行，见[使用](#使用)。
 
-安装脚本默认安装脚本里指定的版本，可以通过 `URCH_VER=x.y.z` 指定其他版本。
+安装脚本默认安装脚本里指定的版本，可以通过 `URCH_VER=x.y.z` 指定其他版本。下载的压缩包会用该版本发布的 `urch_<version>_checksums.txt` 校验。
 
 ### 没有接显示器的机器
 
@@ -199,7 +207,7 @@ sudo tail -f /var/log/urch.log /var/log/urch.err.log
 
 ## Docker
 
-发布到 Docker Hub 的镜像**不受支持**：urch 必须运行在桌面用户的会话里（需要 gsettings、keyring 和 D-Bus），容器里没有这些。请直接在主机上安装。
+不再发布 Docker 镜像：urch 必须运行在桌面用户的会话里（需要 gsettings、keyring 和 D-Bus），容器里没有这些。之前版本发布到 Docker Hub 的镜像不受支持，请直接在主机上安装。
 
 ## 开发
 
