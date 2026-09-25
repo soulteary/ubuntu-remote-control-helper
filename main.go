@@ -21,6 +21,9 @@ const (
 	DEFAULT_DAEMON_MODE               = false
 )
 
+// set by goreleaser with -ldflags "-X main.Version=..."
+var Version = "dev"
+
 type Config struct {
 	User   string
 	Pass   string
@@ -113,7 +116,7 @@ func CreateBackgroundTask(config Config) error {
 }
 
 func main() {
-	fmt.Println(`Remote Control Helper`)
+	fmt.Println(`Remote Control Helper`, Version)
 
 	config, err := ParseConfig(os.Args[1:], os.Getenv)
 	if err != nil {
