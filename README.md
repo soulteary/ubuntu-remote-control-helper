@@ -15,6 +15,7 @@ Ubuntu's built-in Desktop Sharing (RDP, provided by `gnome-remote-desktop`) is e
 - [Usage](#usage)
 - [Configuration](#configuration)
 - [Connect](#connect)
+- [Upgrade from 1.8.0](#upgrade-from-180)
 - [Upgrade from 1.7.0](#upgrade-from-170)
 - [Uninstall](#uninstall)
 - [Troubleshooting](#troubleshooting)
@@ -188,6 +189,25 @@ sudo ufw allow from 192.168.1.0/24 to any port 3389 proto tcp
 ```
 
 Do not forward the port to the internet on your router, use a VPN (e.g. WireGuard, Tailscale) to connect from outside.
+
+## Upgrade from 1.8.0
+
+Run the installer you used before again (`installer-standalone.sh` or `installer.sh`, **without `sudo`**) to replace the program. If you use the systemd user service, also replace the unit, it now starts with the graphical session:
+
+```bash
+wget -O ~/.config/systemd/user/urch.service https://github.com/soulteary/ubuntu-remote-control-helper/raw/main/example/urch.service
+systemctl --user daemon-reload
+systemctl --user reenable urch.service
+systemctl --user restart urch.service
+```
+
+Behavior changes in 1.9.0:
+
+- Every setting is checked on every round, not only when the credentials differ, and only the incorrect ones are corrected.
+- A locked login keyring is reported as an error instead of triggering an unlock prompt on the screen.
+- New settings are applied with `systemctl --user restart gnome-remote-desktop.service` instead of killing the processes, and the unit is enabled when it is disabled, so the daemon starts after reboot.
+- Leading and trailing spaces of the password are kept. If your password has them, urch stores the credentials again with the spaces.
+- Docker images are no longer published.
 
 ## Upgrade from 1.7.0
 
