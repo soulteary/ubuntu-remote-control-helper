@@ -85,6 +85,11 @@ func ParseConfig(args []string, getenv func(string) string) (Config, error) {
 func TryToApplyChange(config Config) error {
 	EnsureSessionBusEnv()
 
+	// do not touch a locked keyring, it would show an unlock prompt on the screen every round
+	if IsDefaultKeyringLocked() {
+		return ErrKeyringLocked
+	}
+
 	fmt.Println("check remote control settings and credentials and correct the problem...")
 	restart, err := EnsureRemoteControlConfig(config.User, config.Pass)
 	if err != nil {

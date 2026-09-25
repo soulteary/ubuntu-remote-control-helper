@@ -239,6 +239,7 @@ sudo tail -f /var/log/urch.log /var/log/urch.err.log
 ```
 
 - **安装后黑屏、进不了桌面**：`/etc/X11/xorg.conf` 中是虚拟显卡驱动的配置（由 `URCH_INSTALL_DUMMY_XORG=1` 安装，或者是 1.7.0 及更早版本的安装脚本写入的）。切换到文本控制台（`Ctrl+Alt+F3`）或通过 ssh 登录，执行 `sudo rm /etc/X11/xorg.conf`（或恢复备份）后重启。
+- **报错 `the login keyring is locked`**：urch 发现登录 keyring 处于锁定状态，因此没有去读取它（读取锁定的 keyring 会在屏幕上弹出解锁框，后台模式下会每分钟弹一次）。这种状态下 `gnome-remote-desktop` 同样读不到凭据，远程连接会失败。请用密码登录一次；如果开启了自动登录，请看[keyring 与自动登录](#keyring-与自动登录)。
 - **报错 `secret-tool: The connection is closed`、`无法在没有 X11 $DISPLAY 的情况下自动启动 D-Bus`，或者 urch 卡住不动**：urch 连不上该用户的桌面会话。请确认没有用 `sudo` 运行、是以已登录的桌面用户身份运行，并且登录 keyring 已解锁。从 supervisor、cron 或 ssh 启动时，urch 会自动使用 `/run/user/<uid>/bus`；命令超过 30 秒会超时退出，不会一直卡住。如果是从 1.7.0 升级上来的，请看[从 1.7.0 升级](#从-170-升级)。
 - **urch 显示成功，但客户端连不上**：用 `ss -tlnp | grep gnome-remote` 查看实际监听的端口（可能是 3390 或更后面的端口，见[连接](#连接)），检查防火墙，并确认桌面用户已登录、屏幕没有锁定。
 - **RDP 端口没有在监听，日志里提示证书无效或缺失**：RDP 需要 TLS 证书，它是在"设置"里第一次打开远程桌面时由设置应用生成的，`gnome-remote-desktop` 自己不会生成，所以只用 urch 配置过的机器可能没有证书。用 `gsettings get org.gnome.desktop.remote-desktop.rdp tls-cert` 检查，值为空就表示没有证书。在"设置"里打开一次远程桌面，或者手动生成：
