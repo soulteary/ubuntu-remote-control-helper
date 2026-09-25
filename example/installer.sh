@@ -6,7 +6,7 @@
 #   bash installer.sh
 #
 # Env:
-#   URCH_VER                  version to install, default 1.7.0
+#   URCH_VER                  version to install, default 1.8.0
 #   UBUNTU_REMOTE_USER        remote control username, asked if not set
 #   UBUNTU_REMOTE_PASS        remote control password, asked if not set
 #   URCH_INSTALL_DUMMY_XORG   set to 1 to install a dummy display driver config for machines
@@ -20,7 +20,7 @@ if [ "$(id -u)" -eq 0 ]; then
   exit 1
 fi
 
-URCH_VER="${URCH_VER:-1.7.0}"
+URCH_VER="${URCH_VER:-1.8.0}"
 DESKTOP_USER="$(id -un)"
 DESKTOP_UID="$(id -u)"
 DESKTOP_HOME="$HOME"

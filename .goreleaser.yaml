@@ -4,13 +4,17 @@ builds:
   - env:
     - CGO_ENABLED=0
     ldflags:
-      - -w -s
+      - -w -s -X main.Version={{ .Version }}
     id: linux
     goos: [linux]
     goarch: ["386", arm, amd64, arm64]
     goarm:
       - "7"
       - "6"
+
+archives:
+  # the installers download `urch_<version>_linux_<arch>.tar.gz`, keep the name stable
+  - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}"
 
 dockers:
 
