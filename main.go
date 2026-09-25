@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 
@@ -20,93 +21,131 @@ const (
 	DEFAULT_DAEMON_MODE               = false
 )
 
-var (
-	URCH_USER   = DEFAULT_USERNAME
-	URCH_PASS   = DEFAULT_PASSWORD
-	URCH_DAEMON = DEFAULT_DAEMON_MODE
-)
+type Config struct {
+	User   string
+	Pass   string
+	Daemon bool
+}
 
-// Initialize global variables
-func init() {
-	fmt.Println(`Remote Control Helper`)
+func isTruthy(s string) bool {
+	s = strings.ToLower(strings.TrimSpace(s))
+	return s == "true" || s == "on" || s == "1"
+}
 
-	envUser := strings.TrimSpace(os.Getenv("UBUNTU_REMOTE_USER"))
-	if envUser != "" {
-		URCH_USER = envUser
-		fmt.Println(`set remote username by env:`, URCH_USER)
+// Parse the configuration, the priority is: cli > env > default.
+func ParseConfig(args []string, getenv func(string) string) (Config, error) {
+	config := Config{User: DEFAULT_USERNAME, Pass: DEFAULT_PASSWORD, Daemon: DEFAULT_DAEMON_MODE}
+
+	if envUser := strings.TrimSpace(getenv("UBUNTU_REMOTE_USER")); envUser != "" {
+		config.User = envUser
+		fmt.Println(`set remote username by env:`, config.User)
+	}
+	if envPass := strings.TrimSpace(getenv("UBUNTU_REMOTE_PASS")); envPass != "" {
+		config.Pass = envPass
+		fmt.Println(`set remote password by env`)
+	}
+	if isTruthy(getenv("UBUNTU_DAEMON")) {
+		config.Daemon = true
 	}
 
-	envPass := strings.TrimSpace(os.Getenv("UBUNTU_REMOTE_PASS"))
-	if envPass != "" {
-		URCH_PASS = envPass
-		fmt.Println(`set remote password by env:`, URCH_PASS)
+	fs := flag.NewFlagSet("urch", flag.ContinueOnError)
+	cliUser := fs.String("user", "", "set remote control username (env: UBUNTU_REMOTE_USER)")
+	cliPass := fs.String("pass", "", "set remote control password (env: UBUNTU_REMOTE_PASS, preferred: command line arguments are visible to other users)")
+	cliDaemon := fs.String("daemon", "", "let app running in daemon mode (env: UBUNTU_DAEMON)")
+	if err := fs.Parse(args); err != nil {
+		return config, err
 	}
 
-	envDaemon := strings.ToLower(strings.TrimSpace(os.Getenv("UBUNTU_DAEMON")))
-	if envDaemon == "true" || envDaemon == "on" || envDaemon == "1" {
-		URCH_DAEMON = true
-	}
-
-	var cliUser string
-	var cliPass string
-	var cliDaemon string
-
-	flag.StringVar(&cliUser, "user", DEFAULT_USERNAME, "set remote control username")
-	flag.StringVar(&cliPass, "pass", DEFAULT_PASSWORD, "set remote control password")
-	flag.StringVar(&cliDaemon, "daemon", "", "let app running in daemon mode")
-	flag.Parse()
-
-	if cliUser != DEFAULT_USERNAME && cliUser != "" {
-		URCH_USER = cliUser
-		fmt.Println(`set remote username by cli:`, URCH_USER)
-	}
-
-	if cliPass != DEFAULT_PASSWORD && cliPass != "" {
-		URCH_PASS = cliPass
-		fmt.Println(`set remote password by cli:`, URCH_PASS)
-	}
-
-	cliDaemon = strings.ToLower(strings.TrimSpace(cliDaemon))
-	if cliDaemon == "true" || cliDaemon == "on" || cliDaemon == "1" {
-		URCH_DAEMON = true
-	}
+	// only flags which were explicitly passed override env and defaults
+	fs.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "user":
+			if v := strings.TrimSpace(*cliUser); v != "" {
+				config.User = v
+				fmt.Println(`set remote username by cli:`, config.User)
+			}
+		case "pass":
+			if v := strings.TrimSpace(*cliPass); v != "" {
+				config.Pass = v
+				fmt.Println(`set remote password by cli`)
+			}
+		case "daemon":
+			config.Daemon = isTruthy(*cliDaemon)
+		}
+	})
+	return config, nil
 }
 
 // attempting to apply the correct configuration.
-func TryToApplyChange() {
+func TryToApplyChange(config Config) error {
+	EnsureSessionBusEnv()
+
 	fmt.Println("check remote control credentials and correct the problem...")
-	if !CheckRemoteControlCredentialsIsCorrect(URCH_USER, URCH_PASS) {
-		UpdateSettings(URCH_USER, URCH_PASS)
+	ok, err := CheckRemoteControlCredentialsIsCorrect(config.User, config.Pass)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		if err := UpdateSettings(config.User, config.Pass); err != nil {
+			return err
+		}
 		KillProcessForApplyNewSettings()
 	}
 	fmt.Println("the configuration has been ensured to be correct.")
+	return nil
 }
 
 // create background task
-func CreateBackgroundTask() {
+func CreateBackgroundTask(config Config) error {
 	fmt.Println("try to create background task...")
-	c := cron.New()
+	c := cron.New(cron.WithChain(cron.SkipIfStillRunning(cron.DiscardLogger)))
 	_, err := c.AddFunc(DEFAULT_CRONTAB_INTERVAL, func() {
-		TryToApplyChange()
+		if err := TryToApplyChange(config); err != nil {
+			log.Println("apply change failed:", err)
+		}
 	})
 	if err != nil {
-		fmt.Printf("create background task failed: %s\n", err)
-		return
+		return fmt.Errorf("create background task failed: %w", err)
 	}
 	fmt.Println("create background task succeeded.")
 	c.Start()
+	return nil
 }
 
 func main() {
+	fmt.Println(`Remote Control Helper`)
+
+	config, err := ParseConfig(os.Args[1:], os.Getenv)
+	if err != nil {
+		os.Exit(2)
+	}
+
+	// gsettings and the keyring are per user, running as root (e.g. with sudo)
+	// would modify root's settings instead of the desktop user's.
+	if os.Geteuid() == 0 {
+		log.Fatal("urch must be run as the desktop user who shares the screen, not as root (do not use sudo).")
+	}
+
+	if config.User == DEFAULT_USERNAME && config.Pass == DEFAULT_PASSWORD {
+		fmt.Println("WARNING: using the default username and password, please set your own with UBUNTU_REMOTE_USER / UBUNTU_REMOTE_PASS.")
+	}
+
 	// Regardless of whether the program needs to run in the background or not,
 	// try to execute system configuration updates first.
-	TryToApplyChange()
+	if err := TryToApplyChange(config); err != nil {
+		if !config.Daemon {
+			log.Fatal(err)
+		}
+		// in daemon mode, keep running and retry later, e.g. the user is not logged in yet
+		log.Println("apply change failed:", err)
+	}
 
 	// If the program needs to run in the background,
 	// then add a background task and keep the program from exiting.
-	if URCH_DAEMON {
-		go CreateBackgroundTask()
-		var chHoldOn = make(chan struct{})
-		<-chHoldOn
+	if config.Daemon {
+		if err := CreateBackgroundTask(config); err != nil {
+			log.Fatal(err)
+		}
+		select {}
 	}
 }

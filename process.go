@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 )
 
 type Process struct {
@@ -14,8 +16,15 @@ type Process struct {
 	CMD string
 }
 
-// Filter processes running in the system according to the filter rule
-func FilterProcess(filter string) ([]Process, error) {
+// Check whether the command line of a process is the given program.
+// Only argv[0] is matched, so e.g. an editor opening a file named after the program is not matched.
+func IsProgramCmdline(cmdline []byte, program string) bool {
+	argv0 := strings.SplitN(string(cmdline), "\x00", 2)[0]
+	return strings.HasPrefix(filepath.Base(argv0), program)
+}
+
+// Filter processes of the current user running in the system according to the program name
+func FilterProcess(program string) ([]Process, error) {
 	d, err := os.Open("/proc")
 	if err != nil {
 		return nil, err
@@ -27,6 +36,7 @@ func FilterProcess(filter string) ([]Process, error) {
 	}()
 
 	var process []Process
+	uid := uint32(os.Getuid()) // #nosec G115 -- uid always fits in uint32
 
 	for {
 		names, err := d.Readdirnames(10)
@@ -48,16 +58,29 @@ func FilterProcess(filter string) ([]Process, error) {
 			}
 
 			pid := int(id)
+			if pid == os.Getpid() {
+				continue
+			}
+
+			// only handle processes of the current user, e.g. skip the system-level
+			// gnome-remote-desktop daemon used for remote login on newer Ubuntu
+			info, err := os.Stat(fmt.Sprintf("/proc/%d", pid))
+			if err != nil {
+				continue
+			}
+			if stat, ok := info.Sys().(*syscall.Stat_t); !ok || stat.Uid != uid {
+				continue
+			}
+
 			cmd, err := os.ReadFile(fmt.Sprintf("/proc/%d/cmdline", pid))
 			if err != nil {
 				continue
 			}
-
-			cmdLine := strings.TrimSpace(string(cmd))
-			if !strings.Contains(cmdLine, filter) {
+			if !IsProgramCmdline(cmd, program) {
 				continue
 			}
 
+			cmdLine := strings.TrimSpace(strings.ReplaceAll(string(cmd), "\x00", " "))
 			process = append(process, Process{PID: pid, CMD: cmdLine})
 		}
 	}
@@ -83,19 +106,26 @@ func KillProcessForApplyNewSettings() {
 	processes, err := FilterProcess(UBUNTU_REMOTE_CONTROL_APPNAME)
 	if err != nil {
 		fmt.Printf("[%s] Find Process failed: %s.\n", UBUNTU_REMOTE_CONTROL_APPNAME, err)
-	} else {
-		for _, process := range processes {
-			fmt.Printf("[%s] Find Process: %d.\n", UBUNTU_REMOTE_CONTROL_APPNAME, process.PID)
-			for {
-				if !CheckProcessExistByPID(process.PID) {
-					fmt.Printf("[%s] Process has been killed.\n", UBUNTU_REMOTE_CONTROL_APPNAME)
-					break
-				}
-				err := syscall.Kill(process.PID, syscall.SIGKILL)
-				if err != nil {
-					fmt.Printf("[%s] Killing process failed: %s.\n", UBUNTU_REMOTE_CONTROL_APPNAME, err)
-				}
+		return
+	}
+	for _, process := range processes {
+		fmt.Printf("[%s] Find Process: %d.\n", UBUNTU_REMOTE_CONTROL_APPNAME, process.PID)
+		if err := syscall.Kill(process.PID, syscall.SIGKILL); err != nil {
+			fmt.Printf("[%s] Killing process failed: %s.\n", UBUNTU_REMOTE_CONTROL_APPNAME, err)
+			continue
+		}
+		killed := false
+		for i := 0; i < 50; i++ {
+			if !CheckProcessExistByPID(process.PID) {
+				killed = true
+				break
 			}
+			time.Sleep(100 * time.Millisecond)
+		}
+		if killed {
+			fmt.Printf("[%s] Process has been killed.\n", UBUNTU_REMOTE_CONTROL_APPNAME)
+		} else {
+			fmt.Printf("[%s] Process %d still exists after being killed.\n", UBUNTU_REMOTE_CONTROL_APPNAME, process.PID)
 		}
 	}
 }
