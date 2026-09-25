@@ -49,22 +49,51 @@ var REMOTE_CONTROL_SETTINGS = []GnomeSetting{
 	{DEFAULT_UBUNTU_REMOTE_DESKTOP_VNC, UBUNTU_SETTING_KEY_VNC_ENABLE, `false`, `false`},
 }
 
-// Update the remote control related configuration in Ubuntu.
-func UpdateSettings(username string, password string) error {
+// Make sure all remote control settings and the credentials have the expected values,
+// only the incorrect ones are updated.
+// Returns whether gnome-remote-desktop needs to be restarted to apply the changes.
+func EnsureRemoteControlConfig(username string, password string) (bool, error) {
+	var incorrect []GnomeSetting
 	for _, setting := range REMOTE_CONTROL_SETTINGS {
-		if err := UpdateGnomeSettings(setting); err != nil {
-			return fmt.Errorf("update gnome settings %s:`%s` failed: %w", setting.Schema, setting.Key, err)
+		ok, err := CheckGnomeSetting(setting)
+		if err != nil {
+			return false, fmt.Errorf("check gnome settings %s:`%s` failed: %w", setting.Schema, setting.Key, err)
+		}
+		if !ok {
+			incorrect = append(incorrect, setting)
 		}
 	}
 
-	ok, err := UpdateRemoteControlCredentials(username, password, false)
+	credentialsOK, err := CheckRemoteControlCredentialsIsCorrect(username, password)
 	if err != nil {
-		return fmt.Errorf("update remote control credentials failed: %w", err)
+		return false, err
 	}
-	if !ok {
-		return errors.New("update remote control credentials failed: the stored credentials do not match")
+
+	restart := false
+	for _, setting := range incorrect {
+		fmt.Printf("gnome settings %s:`%s` is not `%s`, correct it.\n", setting.Schema, setting.Key, setting.Expected)
+		if err := UpdateGnomeSettings(setting); err != nil {
+			return false, fmt.Errorf("update gnome settings %s:`%s` failed: %w", setting.Schema, setting.Key, err)
+		}
+		// the session settings (idle-delay) are not used by gnome-remote-desktop,
+		// avoid interrupting the remote sessions for them
+		if setting.Schema != DEFAULT_UBUNTU_DESKTOP_SESSION {
+			restart = true
+		}
 	}
-	return nil
+
+	if !credentialsOK {
+		fmt.Println("remote control credentials are not correct, update them.")
+		ok, err := UpdateRemoteControlCredentials(username, password, false)
+		if err != nil {
+			return false, fmt.Errorf("update remote control credentials failed: %w", err)
+		}
+		if !ok {
+			return false, errors.New("update remote control credentials failed: the stored credentials do not match")
+		}
+		restart = true
+	}
+	return restart, nil
 }
 
 // Execute a command without shell, optionally feeding stdin, and obtain the normal and error log output contents.
@@ -87,19 +116,39 @@ func ExecuteCommand(stdin string, name string, args ...string) (string, string, 
 	return stdout.String(), stderr.String(), err
 }
 
+// The function used to execute commands, replaced in tests.
+var runCommand = ExecuteCommand
+
+// Read a setting in Gnome.
+func GetGnomeSetting(setting GnomeSetting) (string, error) {
+	stdout, stderr, err := runCommand("", "gsettings", "get", setting.Schema, setting.Key)
+	if err != nil {
+		return "", fmt.Errorf("gsettings get: %w %s", err, strings.TrimSpace(stderr))
+	}
+	return strings.TrimSpace(stdout), nil
+}
+
+// Check if a setting in Gnome already has the expected value.
+func CheckGnomeSetting(setting GnomeSetting) (bool, error) {
+	actual, err := GetGnomeSetting(setting)
+	if err != nil {
+		return false, err
+	}
+	return actual == setting.Expected, nil
+}
+
 // Update the settings in Gnome and check if the changes are actually applied.
 func UpdateGnomeSettings(setting GnomeSetting) error {
-	_, stderr, err := ExecuteCommand("", "gsettings", "set", setting.Schema, setting.Key, setting.Value)
+	_, stderr, err := runCommand("", "gsettings", "set", setting.Schema, setting.Key, setting.Value)
 	if err != nil {
 		return fmt.Errorf("gsettings set: %w %s", err, strings.TrimSpace(stderr))
 	}
 
-	stdout, stderr, err := ExecuteCommand("", "gsettings", "get", setting.Schema, setting.Key)
+	actual, err := GetGnomeSetting(setting)
 	if err != nil {
-		return fmt.Errorf("gsettings get: %w %s", err, strings.TrimSpace(stderr))
+		return err
 	}
-
-	if actual := strings.TrimSpace(stdout); actual != setting.Expected {
+	if actual != setting.Expected {
 		return fmt.Errorf("value is `%s` after update, expected `%s`", actual, setting.Expected)
 	}
 	return nil
@@ -158,21 +207,21 @@ func CheckRemoteControlCredentialsIsCorrect(inputUser string, inputPass string) 
 // When `dryrun` is true, only compare the stored credentials with the expected ones.
 func UpdateRemoteControlCredentials(inputUser string, inputPass string, dryrun bool) (bool, error) {
 	username := strings.TrimSpace(inputUser)
-	password := strings.TrimSpace(inputPass)
-	if username == "" || password == "" {
+	password := inputPass
+	if username == "" || strings.TrimSpace(password) == "" {
 		return false, errors.New("username and password must not be empty")
 	}
 	credentials := BuildRemoteControlCredentials(username, password)
 
 	if !dryrun {
 		// secret-tool reads the secret from stdin, keep it out of the command line
-		_, stderr, err := ExecuteCommand(credentials, "secret-tool", "store", "-l", SECRET_TOOL_LABEL, "xdg:schema", SECRET_TOOL_SCHEMA)
+		_, stderr, err := runCommand(credentials, "secret-tool", "store", "-l", SECRET_TOOL_LABEL, "xdg:schema", SECRET_TOOL_SCHEMA)
 		if err != nil {
 			return false, fmt.Errorf("secret-tool store: %w %s", err, strings.TrimSpace(stderr))
 		}
 	}
 
-	stdout, stderr, err := ExecuteCommand("", "secret-tool", "lookup", "xdg:schema", SECRET_TOOL_SCHEMA)
+	stdout, stderr, err := runCommand("", "secret-tool", "lookup", "xdg:schema", SECRET_TOOL_SCHEMA)
 	if err != nil {
 		// secret-tool exits with 1 and prints nothing when no credentials are stored yet
 		var exitErr *exec.ExitError
