@@ -1,0 +1,24 @@
+# systemd user service for urch, runs inside the desktop user's session.
+#
+# Install (as the desktop user, not with sudo):
+#   mkdir -p ~/.config/systemd/user
+#   cp urch.service ~/.config/systemd/user/urch.service
+#   printf "UBUNTU_REMOTE_USER='your-user'\nUBUNTU_REMOTE_PASS='your-strong-password'\n" > ~/.config/urch.env
+#   chmod 600 ~/.config/urch.env
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now urch.service
+#
+# Logs:
+#   journalctl --user -u urch.service -f
+
+[Unit]
+Description=Ubuntu Remote Control Helper
+
+[Service]
+EnvironmentFile=%h/.config/urch.env
+ExecStart=/usr/local/bin/urch --daemon=1
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
