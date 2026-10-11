@@ -1,5 +1,7 @@
 # Ubuntu Remote Control Helper
 
+[![Go Test Coverage](./.github/coverage.svg)](./.github/go-test-report.md) [![Go Report Card](./.github/goreportcard.svg)](./.github/goreportcard-report.md)
+
 English | [简体中文](README_zh.md)
 
 <img src=".github/urch.jpg" width="180">
