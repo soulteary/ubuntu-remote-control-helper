@@ -56,6 +56,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+      - name: Remove stale generated report evidence
+        if: always() && (github.event_name == 'pull_request')
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -L .github
+          rm -f -- .github/go-test-report.md .github/go-test-report.json .github/coverage.svg .github/goreportcard.svg .github/goreportcard-report.md
+          rm -rf -- .github/test-results
       - name: Test, race and coverage (GTR v1.1.2)
         id: go_test_report
         uses: soulteary/go-test-report-action@bf04b539f7bf2a6f67d602da4259904b3dcdeba1  # v1.1.2
@@ -94,3 +102,24 @@ jobs:
           include-hidden-files: true
           if-no-files-found: warn
           retention-days: 14
+
+  report_release:
+    name: Dispatch verified release reports
+    needs: build
+    if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Request reports for the released tag
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          gh workflow run go-quality-reports.yml --repo "$REPOSITORY" --ref "$DEFAULT_BRANCH" \
+            -f "source_ref=refs/tags/$RELEASE_TAG" -f reuse_existing_tag_report=true
