@@ -11,7 +11,7 @@ on:
     branches:
       - 'main'
 env:
-  GO_VERSION: "1.27.2"
+  GO_VERSION: "1.27.3"
 
 permissions:
   contents: write
@@ -88,6 +88,11 @@ jobs:
           threshold: "0"
           report: "true"
           commit: "false"
+      - name: Restore project Go toolchain
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
       - name: Upload read-only PR quality evidence
         if: "always() && steps.report_cleanup.outcome == 'success' && ((github.event_name == 'pull_request'))"
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
